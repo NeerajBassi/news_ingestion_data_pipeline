@@ -7,6 +7,8 @@ import time
 import random
 from helper_utils.helpers import generate_article_id, drop_timezone, parse_date, datetime_to_iso_with_time
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class PhocuswireScraper:
     def __init__(self, min_delay=1, max_delay=3, max_pages=15, max_retries = 3, backoff_factor= 1.0,timeout = 10 ):
@@ -43,9 +45,9 @@ class PhocuswireScraper:
                 return response
             except RequestException as e:
                 wait = self.backoff_factor * (2 ** attempt)
-                print(f"Request failed: {e}. Retrying in {wait:.1f} seconds (Attempt {attempt + 1} of {self.max_retries})")
+                logger.error(f"Request failed: {e}. Retrying in {wait:.1f} seconds (Attempt {attempt + 1} of {self.max_retries})")
                 time.sleep(wait)
-        print(f"Failed to fetch {url} after {self.max_retries} attempts.")
+        logger.error(f"Failed to fetch {url} after {self.max_retries} attempts.")
         return None
 
     def get_page_url(self, page):
@@ -59,14 +61,14 @@ class PhocuswireScraper:
             response = self.fetch_url_with_retries(url)
 
             if not response:
-                print(f"Stopping scraping due to repeated request failures at page {page}")
+                logger.info(f"Stopping scraping due to repeated request failures at page {page}")
                 break
 
             soup = BeautifulSoup(response.text, "html.parser")
             articles = soup.select("div.article-list  div.item")
 
             if not articles:
-                print(f"No articles found on page {page}, stopping.")
+                logger.info(f"No articles found on page {page}, stopping.")
                 break
 
             stop_paging = False
@@ -75,25 +77,25 @@ class PhocuswireScraper:
                 # Extract news date (inside div.author)
                 title_tag = article.select_one("a.title")
                 if not title_tag:
-                    print("Article missing title link, skipping.")
+                    logger.info("Article missing title link, skipping.")
                     continue
 
                 headline = title_tag.get_text(strip=True) if title_tag else None
 
                 if not title_tag['href']:
-                    print("Article missing href link, skipping.")
+                    logger.info("Article missing href link, skipping.")
                     continue
 
                 news_url = f"{self.base_url}/{title_tag['href']}" if title_tag and 'href' in title_tag.attrs else None
 
                 article_id = generate_article_id(news_url) if news_url else None
                 if article_id in self.seen_article_ids:
-                    print(f"Duplicate article {article_id} found, skipping.")
+                    logger.info(f"Duplicate article {article_id} found, skipping.")
                     continue
 
                 author_span = article.select_one("div.author > span.name")
                 if not author_span:
-                    print(f"Author not available for article id {article_id} and article headline {headline}.")
+                    logger.info(f"Author not available for article id {article_id} and article headline {headline}.")
                 author_name = author_span.get_text(strip=True).replace("By ", "") if author_span else None
                 
                 # Extract news time from div.author text after the pipe symbol
@@ -109,20 +111,17 @@ class PhocuswireScraper:
                     try:
                         news_time = parse_date(news_time, self.source_name)
                     except Exception as e:
-                        print(f"Error parsing date '{news_time}': {e}")
+                        logger.error(f"Error parsing date '{news_time}': {e}")
                         news_time = None
                 if news_time :
                     if last_ingested_date and news_time < last_ingested_date:
                         # If last_ingested_date is set and this article is older or equal, stop ingestion
-                        print(f"News time : {news_time}")
-                        print(f"last -ngested time: {last_ingested_date}")
-
                         stop_paging = True
-                        print(f"Encountered article dated {news_time} < last ingested {last_ingested_date}, stopping.")
+                        logger.info(f"Encountered article dated {news_time} < last ingested {last_ingested_date}, stopping.")
                         break
                 else:
                     # If no date found, you can decide to skip or include
-                    print("Article without date found, skipping date check.")
+                    logger.info("Article without date found, skipping date check.")
 
                 
                 article_data = {
@@ -142,8 +141,8 @@ class PhocuswireScraper:
 
             page += 1
             delay = random.uniform(self.min_delay, self.max_delay)
-            print(f"Sleeping for {delay:.1f} seconds before next page request.")
+            logger.info(f"Sleeping for {delay:.1f} seconds before next page request.")
             time.sleep(delay)
 
-        print(f"Total new articles extracted: {len(self.collected_articles)}")
+        logger.info(f"Total new articles extracted: {len(self.collected_articles)}")
         return self.collected_articles

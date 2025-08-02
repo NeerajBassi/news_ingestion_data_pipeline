@@ -7,6 +7,10 @@ import time
 import random
 from helper_utils.helpers import generate_article_id, drop_timezone, parse_date, datetime_to_iso_with_time
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 class SkiftScraper:
     def __init__(self, min_delay=1, max_delay=3, max_pages=15, max_retries = 3, backoff_factor= 1.0,timeout = 10 ):
         """
@@ -39,9 +43,9 @@ class SkiftScraper:
                 return response
             except RequestException as e:
                 wait = self.backoff_factor * (2 ** attempt)
-                print(f"Request failed: {e}. Retrying in {wait:.1f} seconds (Attempt {attempt + 1} of {self.max_retries})")
+                logger.error(f"Request failed: {e}. Retrying in {wait:.1f} seconds (Attempt {attempt + 1} of {self.max_retries})")
                 time.sleep(wait)
-        print(f"Failed to fetch {url} after {self.max_retries} attempts.")
+        logger.error(f"Failed to fetch {url} after {self.max_retries} attempts.")
         return None
 
     def get_page_url(self, page):
@@ -55,14 +59,14 @@ class SkiftScraper:
             response = self.fetch_url_with_retries(url)
 
             if not response:
-                print(f"Stopping scraping due to repeated request failures at page {page}")
+                logger.info(f"Stopping scraping due to repeated request failures at page {page}")
                 break
 
             soup = BeautifulSoup(response.text, "html.parser")
             articles = soup.select("article")
 
             if not articles:
-                print(f"No articles found on page {page}, stopping.")
+                logger.info(f"No articles found on page {page}, stopping.")
                 break
 
             stop_paging = False
@@ -70,23 +74,23 @@ class SkiftScraper:
             for article in articles:
                 link_tag = article.select_one("h3.c-tease__title a")
                 if not link_tag:
-                    print("Article missing title link, skipping.")
+                    logger.info("Article missing title link, skipping.")
                     continue
 
                 news_url = link_tag.get('href')
                 if not news_url:
-                    print("Article missing href link, skipping.")
+                    logger.info("Article missing href link, skipping.")
                     continue
 
                 article_id = generate_article_id(news_url)
                 if article_id in self.seen_article_ids:
-                    print(f"Duplicate article {article_id} found, skipping.")
+                    logger.info(f"Duplicate article {article_id} found, skipping.")
                     continue
                 
                 headline = link_tag.text.strip() if link_tag else None
                 author_tag = article.select_one("div.c-tease__byline a.underline")
                 if not author_tag:
-                    print(f"Author not available for article id {article_id} and article headline {headline}.")
+                    logger.info(f"Author not available for article id {article_id} and article headline {headline}.")
                 author_name = author_tag.text.strip() if author_tag else None
 
                 time_tag = article.select_one("div.c-tease__byline time")            
@@ -95,17 +99,17 @@ class SkiftScraper:
                 try:
                     news_time = parse_date(news_time)
                 except Exception as e:
-                    print(f"Error parsing date '{news_time}': {e}")
+                    logger.error(f"Error parsing date '{news_time}': {e}")
                     news_time = None
                 if news_time :
                     if last_ingested_date and news_time < last_ingested_date:
                         # If last_ingested_date is set and this article is older or equal, stop ingestion
                         stop_paging = True
-                        print(f"Encountered article dated {news_time} < last ingested {last_ingested_date}, stopping.")
+                        logger.info(f"Encountered article dated {news_time} < last ingested {last_ingested_date}, stopping.")
                         break
                 else:
                     # If no date found, you can decide to skip or include
-                    print("Article without date found, skipping date check.")
+                    logger.info("Article without date found, skipping date check.")
                 
 
                 article_data = {
@@ -124,8 +128,8 @@ class SkiftScraper:
 
             page += 1
             delay = random.uniform(self.min_delay, self.max_delay)
-            print(f"Sleeping for {delay:.1f} seconds before next page request.")
+            logger.info(f"Sleeping for {delay:.1f} seconds before next page request.")
             time.sleep(delay)
 
-        print(f"Total new articles extracted: {len(self.collected_articles)}")
+        logger.info(f"Total new articles extracted: {len(self.collected_articles)}")
         return self.collected_articles
