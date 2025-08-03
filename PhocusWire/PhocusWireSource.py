@@ -11,13 +11,35 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class PhocuswireScraper:
-    def __init__(self, min_delay=1, max_delay=3, max_pages=15, max_retries = 3, backoff_factor= 1.0,timeout = 10 ):
+    """
+    A web scraper class to extract news articles from the Phocuswire website.
+
+    Attributes:
+        base_url (str): Base URL for Phocuswire news.
+        headers (dict): HTTP headers to be used in requests (e.g., User-Agent).
+        min_delay (float): Minimum delay in seconds between page requests to avoid rate limiting.
+        max_delay (float): Maximum delay in seconds between page requests.
+        max_retries (int): Maximum number of retry attempts for failed HTTP requests.
+        backoff_factor (float): Multiplier for exponential backoff delay between retries.
+        timeout (int): Timeout in seconds for each HTTP request.
+        collected_articles (list): List of dictionaries containing scraped article data.
+        seen_article_ids (set): Set of seen article IDs to avoid duplicates.
+        source_name (str): Name identifier for the source site ("Phocuswire").
+    """
+
+    def __init__(self, min_delay=1, max_delay=3, max_retries = 3, backoff_factor= 1.0,timeout = 10 ):
         """
-        Initialize the PhocusewireScraper.
-        :param min_delay: minimum delay between requests (seconds)
-        :param max_delay: maximum delay between requests (seconds)
-        :param max_pages: max number of pages to scrape
+        Initialize the PhocuswireScraper with configuration parameters.
+
+        Args:
+            min_delay (float ): Minimum delay between requests in seconds. Defaults to 1.
+            max_delay (float ): Maximum delay between requests in seconds. Defaults to 3.
+            max_retries (int ): Maximum retry attempts for HTTP requests. Defaults to 3.
+            backoff_factor (float): Backoff multiplier for retries delays. Defaults to 1.0.
+            timeout (int): Timeout in seconds for HTTP requests. Defaults to 10.
+            source_name (string) : Source name
         """
+
         self.base_url = "https://www.phocuswire.com"
         self.headers =  {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -27,7 +49,6 @@ class PhocuswireScraper:
         self.min_delay = min_delay
         self.source_name = "Phocuswire"
         self.max_delay = max_delay
-        self.max_pages = max_pages
         self.max_retries = max_retries
         self.backoff_factor = backoff_factor
         self.timeout = timeout
@@ -35,6 +56,16 @@ class PhocuswireScraper:
         self.seen_article_ids = set()
 
     def fetch_url_with_retries(self, url):
+        """
+        Fetch the content of a URL using HTTP GET with retry and exponential backoff.
+
+        Args:
+            url (str): The URL to request.
+
+        Returns:
+            requests.Response or None: The successful HTTP response object if request succeeds; 
+            None if all retries fail.
+        """
         for attempt in range(self.max_retries):
             try:
                 if self.headers: 
@@ -51,9 +82,42 @@ class PhocuswireScraper:
         return None
 
     def get_page_url(self, page):
+        """
+        Construct the URL for a specific page number for Phocuswire news listing.
+
+        Args:
+            page (int): The page number to construct the URL for.
+
+        Returns:
+            str: The fully constructed URL for the news page.
+        """
         return f"{self.base_url}/Latest-News?pg={page}"
 
     def extract_articles(self,last_ingested_date):
+        """
+        Extract articles from Phocuswire pages starting from page 1, stopping if 
+        articles older than the last ingested date are encountered.
+
+        This method:
+          - Fetches pages sequentially with delays.
+          - Parses the HTML to extract article info (title, author, publish date, URL).
+          - Uses incremental ingestion cutoff by comparing article dates.
+          - Avoids duplicates based on generated article IDs.
+          - Logs progress and errors during scraping.
+
+        Args:
+            last_ingested_date (datetime.datetime or None): The cutoff datetime to stop scraping 
+            older articles.
+
+        Returns:
+            list of dict: A list of article data dictionaries with keys:
+                - 'Article_id' (str)
+                - 'News_title' (str)
+                - 'News_link' (str)
+                - 'Author_name' (str or None)
+                - 'News_published_time' (ISO8601-formatted string or None)
+                - 'Source_name' (str, always "Phocuswire")
+        """
         page = 1
 
         while True:
