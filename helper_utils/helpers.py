@@ -1,6 +1,5 @@
 from datetime import datetime
 import hashlib
-import logging
 
 def parse_date(date_str, source= 'Skift'):
     """

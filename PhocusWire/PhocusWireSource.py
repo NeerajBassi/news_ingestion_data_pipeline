@@ -5,7 +5,7 @@ from requests.exceptions import RequestException
 import logging
 import time
 import random
-from helper_utils.helpers import generate_article_id, drop_timezone, parse_date, datetime_to_iso_with_time
+from helper_utils.helpers import generate_article_id, parse_date, datetime_to_iso_with_time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
