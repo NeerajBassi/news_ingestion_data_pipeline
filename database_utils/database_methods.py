@@ -11,27 +11,30 @@ class Database:
     A utility class to manage SQLite database operations for storing news articles.
 
     Attributes:
-        DB_DIR (str): Directory path where the SQLite database file is located.
+        DB_DIR (str): Relative directory path where the SQLite database file is located.
         DB_FILE (str): Filename of the SQLite database.
         DB_PATH (str): Full path combining DB_DIR and DB_FILE.
         DEFAULT_TIMESTAMP (str): Default timestamp used when no articles present.
         TABLE_NAME (str): Name of the table to store articles.
     """
      
-    def __init__(self, DB_DIR, DB_FILE):
+    def __init__(self, DB_DIR, DB_FILE, DEFAULT_TIMESTAMP = "2025-07-25T00:00:00", TABLE_NAME = "articles"):
         """
         Initialize Database instance and ensure the articles table exists.
 
         Args:
             DB_DIR (str): Directory path for database file.
             DB_FILE (str): SQLite database filename.
+            DEFAULT_TIMESTAMP (str): Starting timestamp in case of full load (Default = "2025-07-25T00:00:00")
+            TABLE_NAME (str): Target SQLite table name (Default = "articles")
+
         """
 
         self.DB_DIR = DB_DIR
         self.DB_FILE = DB_FILE
         self.DB_PATH = os.path.join(DB_DIR, DB_FILE)
-        self.DEFAULT_TIMESTAMP = "2025-07-25T00:00:00"
-        self.TABLE_NAME = "articles"
+        self.DEFAULT_TIMESTAMP = DEFAULT_TIMESTAMP
+        self.TABLE_NAME = TABLE_NAME
         self.create_table_if_not_exist()
 
     def get_latest_news_time(self):
@@ -62,12 +65,12 @@ class Database:
         except sqlite3.Error as e:
             logger.error(f"Error fetching latest news time: {e}")
 
-    def upsert_articles(self, filtered_articles):
+    def upsert_articles(self, extracted_articles):
         """
         Insert or update articles in the database using upsert logic based on Article_id.
 
         Args:
-            filtered_articles (iterable of dict): List or iterable of article data dictionaries.
+            extracted_articles (iterable of dict): List or iterable of article data dictionaries.
                 Each dictionary must include:
                   'Article_id', 'News_link', 'News_title', 'Author_name',
                   'News_published_time', and 'Source_name'.
@@ -77,7 +80,7 @@ class Database:
         try:
             with sqlite3.connect(self.DB_PATH) as conn:
                 cursor = conn.cursor()
-                for article in filtered_articles:
+                for article in extracted_articles:
                     sql = f"""
                     INSERT INTO {self.TABLE_NAME} (Article_id,  News_link, News_title, Author_name, News_published_time, Source_name, Processed_at)
                     VALUES (?, ?,  ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -128,7 +131,7 @@ class Database:
 
     def create_table_if_not_exist(self):
         """
-        Create the articles table if it does not already exist.
+        Create the  table if it does not already exist.
 
         Ensures the database directory exists before table creation.
 
