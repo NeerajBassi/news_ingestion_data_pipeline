@@ -4,6 +4,8 @@
 
 This project implements a robust web scraping and ingestion pipeline to collect news articles from multiple sources (e.g., Skift, PhocusWire), process them, and store them in a local SQLite database and displays the top 5 (configurable) latest articles sorted by news article publication time.
 
+Main pipeline execution code is in `ingestion.ipynb`
+
 ## 1. Ingestion
 
 The ingestion process involves web scraping paginated news article pages from multiple sources. Each source has its own scraper class implementing:
